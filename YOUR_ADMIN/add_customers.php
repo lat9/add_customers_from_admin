@@ -7,6 +7,7 @@
  * add_customers module modified by Garden 2012-07-20
  * www.inzencart.cz Czech forum for ZenCart
  * Modified for Zen Cart 1.5.0, v1.5.1, lat9 2013-05-16
+ * Modified for Zen Cart 1.5.5, lat9 2015-12-24
  */
 require('includes/application_top.php');
 
@@ -54,7 +55,9 @@ if (zen_not_null($action)) {
       } else {
         $thePassword = false;
         if (isset($_POST['reset_pw']) && $_POST['reset_pw'] == 1) {
-          $thePassword = zen_create_random_value(ENTRY_PASSWORD_MIN_LENGTH);
+//-bof-20151224-lat9-Use updated random number generator, if available.
+          $thePassword = (function_exists ('zen_create_PADSS_password')) ? zen_create_PADSS_password ((ENTRY_PASSWORD_MIN_LENGTH > 0) ? ENTRY_PASSWORD_MIN_LENGTH : 5) : zen_create_random_value (ENTRY_PASSWORD_MIN_LENGTH);
+//-eof-20151224-lat9
           $sql = "UPDATE " . TABLE_CUSTOMERS . "
                   SET customers_password = '" . zen_encrypt_password($thePassword) . "'
                   where customers_id = '" . (int)$_POST['resend_id'] . "'";

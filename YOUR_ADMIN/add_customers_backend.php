@@ -173,8 +173,10 @@ function get_row_id($field_name, $line) {
 
 function insert_customer($inArray) {
   global $db, $messageStack;
-
-  $customers_password = zen_create_random_value(ENTRY_PASSWORD_MIN_LENGTH);
+  
+//-bof-20151224-lat9-Use updated random number generator, if available.
+  $customers_password = (function_exists ('zen_create_PADSS_password')) ? zen_create_PADSS_password ((ENTRY_PASSWORD_MIN_LENGTH > 0) ? ENTRY_PASSWORD_MIN_LENGTH : 5) : zen_create_random_value (ENTRY_PASSWORD_MIN_LENGTH);
+//-eof-20151224-lat9
 
   $customers_firstname = zen_db_prepare_input($inArray['customers_firstname']);
   $customers_lastname = zen_db_prepare_input($inArray['customers_lastname']);
@@ -589,24 +591,29 @@ function get_countries_id($countries_iso_code_2) {
 }
 
 function phone_validate($telephone) {
-  /* ---- 
-  ** Bypass the world phone prefix if it's the first character in the phone number.
-  */
+  // -----
+  // Bypass the world phone prefix if it's the first character in the phone number.
+  //
   $start_pos = 0;
-  if ( (strpos($telephone, ENTRY_PHONE_NO_DELIM_WORLD ) !== false) && (strpos($telephone, ENTRY_PHONE_NO_DELIM_WORLD) == 0) ) $start_pos = 1;
+  if (ENTRY_PHONE_NO_DELIM_WORLD !== false && strpos ($telephone, ENTRY_PHONE_NO_DELIM_WORLD) === 0) $start_pos = 1;
+  
+  // -----
+  // Remove all the delimiter characters, the remaining telephone should contain only digits (0-9).
+  //
+  $telephone = str_replace (str_split (ENTRY_PHONE_NO_DELIMS), '', $telephone);
 
-  for( $i = $start_pos, $errorMessage = false, $num_digits = 0; $i < strlen($telephone) && !$errorMessage; $i++ ) {
-    if( (strpos( ENTRY_PHONE_NO_DELIMS, $telephone[$i]) === false) && ($telephone[$i] < '0' || $telephone[$i] > '9') ) {
-      $errorMessage = sprintf(ENTRY_PHONE_NO_CHAR_ERROR, $telephone[$i]);
-    } else if( $telephone[$i] >= '0' && $telephone[$i] <= '9' ) {
+  for( $i = $start_pos, $errorMessage = false, $num_digits = 0, $telephone_len = strlen ($telephone); $i < $telephone_len && !$errorMessage; $i++ ) {
+    if ($telephone[$i] < '0' || $telephone[$i] > '9') {
+      $errorMessage = sprintf (ENTRY_PHONE_NO_CHAR_ERROR, $telephone[$i]);
+    } else {
       $num_digits++;
     }
   }
 
-  if( !$errorMessage ) {
-    if( $num_digits < ENTRY_PHONE_NO_MIN_DIGITS ) {
+  if ( !$errorMessage ) {
+    if ( $num_digits < ENTRY_PHONE_NO_MIN_DIGITS ) {
       $errorMessage = ENTRY_PHONE_NO_MIN_ERROR;
-    } else if( $num_digits > ENTRY_PHONE_NO_MAX_DIGITS ) {
+    } elseif ( $num_digits > ENTRY_PHONE_NO_MAX_DIGITS ) {
       $errorMessage = ENTRY_PHONE_NO_MAX_ERROR;
     }
   }
