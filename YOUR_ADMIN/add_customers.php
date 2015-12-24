@@ -126,7 +126,7 @@ if (count($errors) > 0) {
   $infoDivContents .= '</ul></div>';
 }
 
-if (/*-bof-v2.0.3a*/is_array($feedback) && /*-eof-v2.0.3a*/count($feedback)) {
+if (isset ($feedback) && is_array($feedback) && count($feedback) > 0) {
   $infoDivContents .= '<div class="okDiv"><p class="okBold">' . ((count($errors) && $_POST['insert_mode'] == 'file') ? MESSAGE_LINES_OK_NOT_INSERTED : MESSAGE_CUSTOMERS_OK) . '</p><ul>';
  
   foreach ($feedback as $line_no=>$feedback_msg) {
@@ -224,7 +224,7 @@ $resendID = (isset($_POST['resend_id'])) ? $_POST['resend_id'] : 0;
               </tr>
             </table></td>
       
-            <td id="single"><div class="headingLabel"><?php echo CUSTOMERS_SINGLE_ENTRY; ?></div><?php if ($action == 'add_single' && zen_not_null($_POST['insert_x']) && zen_not_null($_POST['insert_y'])) echo $infoDivContents; ?><?php echo zen_draw_form('customers_1', FILENAME_ADD_CUSTOMERS, '', 'post') . zen_hide_session_id() . zen_draw_hidden_field( 'action', 'add_single'); ?><table border="0" width="100%" cellspacing="0" cellpadding="0">
+            <td id="single"><div class="headingLabel"><?php echo CUSTOMERS_SINGLE_ENTRY; ?></div><?php if ($action == 'add_single' && isset($_POST['insert_y'])) echo $infoDivContents; ?><?php echo zen_draw_form('customers_1', FILENAME_ADD_CUSTOMERS, '', 'post') . zen_hide_session_id() . zen_draw_hidden_field( 'action', 'add_single'); ?><table border="0" width="100%" cellspacing="0" cellpadding="0">
               <tr>
                 <td class="formAreaTitle"><?php echo CATEGORY_PERSONAL; ?></td>
               </tr>

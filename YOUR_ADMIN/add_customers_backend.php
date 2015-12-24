@@ -178,22 +178,26 @@ function insert_customer($inArray) {
   $customers_password = (function_exists ('zen_create_PADSS_password')) ? zen_create_PADSS_password ((ENTRY_PASSWORD_MIN_LENGTH > 0) ? ENTRY_PASSWORD_MIN_LENGTH : 5) : zen_create_random_value (ENTRY_PASSWORD_MIN_LENGTH);
 //-eof-20151224-lat9
 
-  $customers_firstname = zen_db_prepare_input($inArray['customers_firstname']);
-  $customers_lastname = zen_db_prepare_input($inArray['customers_lastname']);
+  $customers_firstname = (isset ($inArray['customers_firstname'])) ? zen_db_prepare_input($inArray['customers_firstname']) : '';
+  $customers_lastname = (isset ($inArray['customers_lastname'])) ? zen_db_prepare_input($inArray['customers_lastname']) : '';
+  if (!isset ($inArray['customers_email_address'])) {
+    trigger_error ("insert_customer, missing email address: " . var_export ($inArray, true), E_USER_ERROR);
+    exit ();
+  }
   $customers_email_address = zen_db_prepare_input($inArray['customers_email_address']);
-  $customers_telephone = zen_db_prepare_input($inArray['customers_telephone']);
-  $customers_fax = zen_db_prepare_input($inArray['customers_fax']);
-  $customers_newsletter = zen_db_prepare_input($inArray['customers_newsletter']);
-  $customers_group_pricing = (int)zen_db_prepare_input($inArray['customers_group_pricing']);
-  $customers_email_format = zen_db_prepare_input($inArray['customers_email_format']);
-  $customers_gender = zen_db_prepare_input($inArray['customers_gender']);
-  $customers_dob = (empty($inArray['customers_dob']) ? zen_db_prepare_input('0001-01-01 00:00:00') : zen_db_prepare_input($inArray['customers_dob']));
+  $customers_telephone = (isset ($inArray['customers_telephone'])) ? zen_db_prepare_input($inArray['customers_telephone']) : '';
+  $customers_fax = (isset ($inArray['customers_fax'])) ? zen_db_prepare_input($inArray['customers_fax']) : '';
+  $customers_newsletter = (isset ($inArray['customers_newsletter'])) ? zen_db_prepare_input($inArray['customers_newsletter']) : '0';
+  $customers_group_pricing = (isset ($inArray['customers_group_pricing'])) ? (int)zen_db_prepare_input($inArray['customers_group_pricing']) : 0;
+  $customers_email_format = (isset ($inArray['customers_email_format'])) ? zen_db_prepare_input($inArray['customers_email_format']) : 'TEXT';
+  $customers_gender = (isset ($inArray['customers_gender'])) ? zen_db_prepare_input($inArray['customers_gender']) : '';
+  $customers_dob = (isset($inArray['customers_dob'])) ? zen_db_prepare_input('0001-01-01 00:00:00') : zen_db_prepare_input($inArray['customers_dob']));
 
 
-  $customers_authorization = zen_db_prepare_input($inArray['customers_authorization']);
-  $customers_referral= zen_db_prepare_input($inArray['customers_referral']);
+  $customers_authorization = (isset($inArray['customers_authorization'])) ? (int)zen_db_prepare_input($inArray['customers_authorization']) : 0;
+  $customers_referral= (isset($inArray['customers_referral'])) ? zen_db_prepare_input($inArray['customers_referral']) : '';
 
-  $send_welcome = zen_db_prepare_input($inArray['send_welcome']);
+  $send_welcome = (isset($inArray['send_welcome'])) ? zen_db_prepare_input($inArray['send_welcome']) : 0;
 
   if (CUSTOMERS_APPROVAL_AUTHORIZATION == 2 and $customers_authorization == 1) {
     $customers_authorization = 2;
@@ -205,19 +209,17 @@ function insert_customer($inArray) {
     $messageStack->add_session(ERROR_CUSTOMER_APPROVAL_CORRECTION1, 'caution');
   }
 
-  $default_address_id = zen_db_prepare_input($inArray['default_address_id']);
-  $entry_street_address = zen_db_prepare_input($inArray['entry_street_address']);
-  $entry_suburb = zen_db_prepare_input($inArray['entry_suburb']);
-  $entry_postcode = zen_db_prepare_input($inArray['entry_postcode']);
-  $entry_city = zen_db_prepare_input($inArray['entry_city']);
-  $entry_country_id = zen_db_prepare_input($inArray['entry_country_id']);
+  $default_address_id = (isset($inArray['default_address_id'])) ? (int)zen_db_prepare_input($inArray['default_address_id']) : 0;
+  $entry_street_address = (isset($inArray['entry_street_address'])) ? zen_db_prepare_input($inArray['entry_street_address']) : '';
+  $entry_suburb = (isset($inArray['entry_suburb'])) ? zen_db_prepare_input($inArray['entry_suburb']) : '';
+  $entry_postcode = (isset($inArray['entry_postcode'])) ? zen_db_prepare_input($inArray['entry_postcode']) : '';
+  $entry_city = (isset($inArray['entry_city'])) ? zen_db_prepare_input($inArray['entry_city']) : '';
+  $entry_country_id = (isset($inArray['entry_country_id'])) ? (int)zen_db_prepare_input($inArray['entry_country_id']) : 0;
 
-  $entry_company = zen_db_prepare_input($inArray['entry_company']);
-  $entry_state = zen_db_prepare_input($inArray['entry_state']);
+  $entry_company = (isset($inArray['entry_company'])) ? zen_db_prepare_input($inArray['entry_company']) : '';
+  $entry_state = (isset($inArray['entry_state'])) ? zen_db_prepare_input($inArray['entry_state']) : '';
 
-  if (isset($inArray['entry_zone_id'])) {
-    $entry_zone_id = zen_db_prepare_input($inArray['entry_zone_id']);
-  }
+  $entry_zone_id = (isset($inArray['entry_zone_id'])) ? (int)zen_db_prepare_input($inArray['entry_zone_id']) : 0;
 
   $sql_data_array = array('customers_firstname'     => $customers_firstname,
                           'customers_lastname'      => $customers_lastname,
@@ -404,20 +406,15 @@ function validate_customer(&$inArray, $dateFormatName) {
 
   $errors = array();
 
-  $customers_password = zen_create_random_value(ENTRY_PASSWORD_MIN_LENGTH);
-  $customers_firstname = zen_db_prepare_input($inArray['customers_firstname']);
-  $customers_lastname = zen_db_prepare_input($inArray['customers_lastname']);
-  $customers_email_address = zen_db_prepare_input($inArray['customers_email_address']);
-  $customers_telephone = zen_db_prepare_input($inArray['customers_telephone']);
-  $customers_fax = zen_db_prepare_input($inArray['customers_fax']);
-  $customers_newsletter = zen_db_prepare_input($inArray['customers_newsletter']);
-  $customers_group_pricing = (int)zen_db_prepare_input($inArray['customers_group_pricing']);
-  $customers_email_format = zen_db_prepare_input($inArray['customers_email_format']);
-  $customers_gender = zen_db_prepare_input($inArray['customers_gender']);
-  $customers_dob = zen_db_prepare_input($inArray['customers_dob']);
-  $customers_authorization = zen_db_prepare_input($inArray['customers_authorization']);
-  $customers_referral= zen_db_prepare_input($inArray['customers_referral']);
-  $send_welcome = zen_db_prepare_input($inArray['send_welcome']);
+  $customers_firstname = (isset ($inArray['customers_firstname'])) ? zen_db_prepare_input($inArray['customers_firstname']) : '';
+  $customers_lastname = (isset ($inArray['customers_lastname'])) ? zen_db_prepare_input($inArray['customers_lastname']) : '';
+  $customers_email_address = (isset ($inArray['customers_email_address'])) ? zen_db_prepare_input($inArray['customers_email_address']) : '';
+  $customers_telephone = (isset ($inArray['customers_telephone'])) ? zen_db_prepare_input($inArray['customers_telephone']) : '';
+  $customers_fax = (isset ($inArray['customers_fax'])) ? zen_db_prepare_input($inArray['customers_fax']) : '';
+  $customers_group_pricing = (isset ($inArray['customers_group_pricing'])) ? (int)zen_db_prepare_input($inArray['customers_group_pricing']) : 0;
+  $customers_gender = (isset ($inArray['customers_gender'])) ? zen_db_prepare_input($inArray['customers_gender']) : '';
+  $customers_dob = (isset ($inArray['customers_dob'])) ? zen_db_prepare_input($inArray['customers_dob']) : '';
+  $customers_authorization = (isset ($inArray['customers_authorization'])) ? (int)zen_db_prepare_input($inArray['customers_authorization']) : 0;
 
   if (CUSTOMERS_APPROVAL_AUTHORIZATION == 2 and $customers_authorization == 1) {
     $customers_authorization = 2;
@@ -429,19 +426,15 @@ function validate_customer(&$inArray, $dateFormatName) {
     $messageStack->add_session(ERROR_CUSTOMER_APPROVAL_CORRECTION1, 'caution');
   }
 
-  $default_address_id = zen_db_prepare_input($inArray['default_address_id']);
-  $entry_street_address = zen_db_prepare_input($inArray['entry_street_address']);
-  $entry_suburb = zen_db_prepare_input($inArray['entry_suburb']);
-  $entry_postcode = zen_db_prepare_input($inArray['entry_postcode']);
-  $entry_city = zen_db_prepare_input($inArray['entry_city']);
-  $entry_country_id = (int)zen_db_prepare_input($inArray['entry_country_id']);
+  $entry_street_address = (isset ($inArray['entry_street_address'])) ? zen_db_prepare_input($inArray['entry_street_address']) : '';
+  $entry_suburb = (isset ($inArray['entry_suburb'])) ? zen_db_prepare_input($inArray['entry_suburb']) : '';
+  $entry_postcode = (isset ($inArray['entry_postcode'])) ? zen_db_prepare_input($inArray['entry_postcode']) : '';
+  $entry_city = (isset ($inArray['entry_city'])) ? zen_db_prepare_input($inArray['entry_city']) : '';
+  $entry_country_id = (isset ($inArray['entry_country_id'])) ? (int)zen_db_prepare_input($inArray['entry_country_id']) : 0;
 
-  $entry_company = zen_db_prepare_input($inArray['entry_company']);
-  $entry_state = zen_db_prepare_input($inArray['entry_state']);
-
-  if (isset($inArray['entry_zone_id'])) {
-    $entry_zone_id = zen_db_prepare_input($inArray['entry_zone_id']);
-  }
+  $entry_company = (isset ($inArray['entry_company'])) ? zen_db_prepare_input($inArray['entry_company']) : '';
+  $entry_state = (isset ($inArray['entry_state'])) ? zen_db_prepare_input($inArray['entry_state']) : '';
+  $entry_zone_id = (isset($inArray['entry_zone_id'])) ? (int)zen_db_prepare_input($inArray['entry_zone_id']) : 0;
 
   if (ACCOUNT_GENDER == 'true') {
     if ($customers_gender != 'm' && $customers_gender != 'f') {
@@ -462,7 +455,7 @@ function validate_customer(&$inArray, $dateFormatName) {
     $customers_dob = '0001-01-01 00:00:00';
   } else {
     $dobFormat = $theFormats[(int)(isset($_POST[$dateFormatName]) ? $_POST[$dateFormatName] : 0)];
-  $dobError  = sprintf(ERROR_DOB_INVALID, $dobFormat);
+    $dobError  = sprintf(ERROR_DOB_INVALID, $dobFormat);
     if (ENTRY_DOB_MIN_LENGTH > 0 && strlen($customers_dob) < ENTRY_DOB_MIN_LENGTH) {
       $errors[] = $dobError . " ($customers_dob)";  /*v2.0.3c*/
     } else {
