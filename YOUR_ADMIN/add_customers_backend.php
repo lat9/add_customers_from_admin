@@ -191,7 +191,7 @@ function insert_customer($inArray) {
   $customers_group_pricing = (isset ($inArray['customers_group_pricing'])) ? (int)zen_db_prepare_input($inArray['customers_group_pricing']) : 0;
   $customers_email_format = (isset ($inArray['customers_email_format'])) ? zen_db_prepare_input($inArray['customers_email_format']) : 'TEXT';
   $customers_gender = (isset ($inArray['customers_gender'])) ? zen_db_prepare_input($inArray['customers_gender']) : '';
-  $customers_dob = (isset($inArray['customers_dob'])) ? zen_db_prepare_input('0001-01-01 00:00:00') : zen_db_prepare_input($inArray['customers_dob']));
+  $customers_dob = (isset($inArray['customers_dob'])) ? zen_db_prepare_input('0001-01-01 00:00:00') : zen_db_prepare_input($inArray['customers_dob']);
 
 
   $customers_authorization = (isset($inArray['customers_authorization'])) ? (int)zen_db_prepare_input($inArray['customers_authorization']) : 0;
