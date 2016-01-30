@@ -178,8 +178,8 @@ function insert_customer($inArray) {
   $customers_password = (function_exists ('zen_create_PADSS_password')) ? zen_create_PADSS_password ((ENTRY_PASSWORD_MIN_LENGTH > 0) ? ENTRY_PASSWORD_MIN_LENGTH : 5) : zen_create_random_value (ENTRY_PASSWORD_MIN_LENGTH);
 //-eof-20151224-lat9
 
-  $customers_firstname = (isset ($inArray['customers_firstname'])) ? zen_db_prepare_input($inArray['customers_firstname']) : '';
-  $customers_lastname = (isset ($inArray['customers_lastname'])) ? zen_db_prepare_input($inArray['customers_lastname']) : '';
+  $customers_firstname = (isset ($inArray['customers_firstname'])) ? zen_db_prepare_input(zen_sanitize_string($inArray['customers_firstname'])) : '';
+  $customers_lastname = (isset ($inArray['customers_lastname'])) ? zen_db_prepare_input(zen_sanitize_string($inArray['customers_lastname'])) : '';
   if (!isset ($inArray['customers_email_address'])) {
     trigger_error ("insert_customer, missing email address: " . var_export ($inArray, true), E_USER_ERROR);
     exit ();
@@ -189,7 +189,7 @@ function insert_customer($inArray) {
   $customers_fax = (isset ($inArray['customers_fax'])) ? zen_db_prepare_input($inArray['customers_fax']) : '';
   $customers_newsletter = (isset ($inArray['customers_newsletter'])) ? zen_db_prepare_input($inArray['customers_newsletter']) : '0';
   $customers_group_pricing = (isset ($inArray['customers_group_pricing'])) ? (int)zen_db_prepare_input($inArray['customers_group_pricing']) : 0;
-  $customers_email_format = (isset ($inArray['customers_email_format'])) ? zen_db_prepare_input($inArray['customers_email_format']) : 'TEXT';
+  $customers_email_format = (isset ($inArray['customers_email_format'])) ? zen_db_prepare_input($inArray['customers_email_format']) : ((ACCOUNT_EMAIL_PREFERENCE == '1') ? 'HTML' : 'TEXT');
   $customers_gender = (isset ($inArray['customers_gender'])) ? zen_db_prepare_input($inArray['customers_gender']) : '';
   $customers_dob = (isset($inArray['customers_dob'])) ? zen_db_prepare_input('0001-01-01 00:00:00') : zen_db_prepare_input($inArray['customers_dob']);
 
@@ -339,7 +339,7 @@ function sendWelcomeEmail($customers_gender, $customers_firstname, $customers_la
     $admin_html_msg['COUPON_TEXT_VOUCHER_IS'] = EMAIL_COUPON_INCENTIVE_HEADER ;
     $admin_html_msg['COUPON_DESCRIPTION']     = (!empty($coupon_desc->fields['coupon_description']) ? '<strong>' . $coupon_desc->fields['coupon_description'] . '</strong>' : '');
     $admin_html_msg['COUPON_TEXT_TO_REDEEM']  = str_replace("\n", '', sprintf(EMAIL_COUPON_REDEEM, ''));
-     $admin_html_msg['COUPON_CODE']  = $coupon->fields['coupon_code'];
+    $admin_html_msg['COUPON_CODE']  = $coupon->fields['coupon_code'];
   } //endif coupon
 
   if (NEW_SIGNUP_GIFT_VOUCHER_AMOUNT > 0) {
