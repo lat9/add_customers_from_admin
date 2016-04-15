@@ -306,7 +306,7 @@ $resendID = (isset($_POST['resend_id'])) ? $_POST['resend_id'] : 0;
               <tr>
                 <td class="formArea"><table border="0" cellspacing="2" cellpadding="2">
                   <tr>
-                    <td class="main Label"><?php echo ENTRY_STREET_ADDRESS; ?></td>
+                    <td class="main mainLabel"><?php echo ENTRY_STREET_ADDRESS; ?></td>
                     <td class="main"><input size="30" name="entry_street_address" value="<?php echo $cInfo->entry_street_address; ?>" /></td>
                   </tr>           
 <?php
@@ -392,7 +392,7 @@ $resendID = (isset($_POST['resend_id'])) ? $_POST['resend_id'] : 0;
                   </tr>
           
                   <tr>
-                    <td class="main Label"><?php echo ENTRY_NEWSLETTER; ?></td>
+                    <td class="main mainLabel"><?php echo ENTRY_NEWSLETTER; ?></td>
 <?php
 //-bof-v2.0.4-a
 $newsletter =  ( (empty($cInfo) && ACCOUNT_NEWSLETTER_STATUS == '2') || (isset($cInfo) && $cInfo->customers_newsletter == '1') ) ? '1' : '0';
