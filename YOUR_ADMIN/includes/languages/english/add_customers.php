@@ -10,6 +10,7 @@
  *
  * Modified for Zen Cart 1.5.0, lat9, 2012-08-31
  */
+require DIR_WS_LANGUAGES . $_SESSION['language'] . '/gv_name.php';
 
 define('HEADING_TITLE', 'Add Customers');
 
