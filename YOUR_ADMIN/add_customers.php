@@ -29,7 +29,7 @@ $theFormats = [
     'DD-MM-YYYY'
 ];
 
-require 'add_customers_backend.php';
+require DIR_WS_CLASSES . 'addCustomers.php';
 
 // -----
 // Initialize $cInfo array for single-entry form.
