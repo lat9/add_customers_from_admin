@@ -15,10 +15,9 @@ require 'includes/application_top.php';
 require DIR_WS_CLASSES . 'currencies.php';
 $currencies = new currencies();
 
-$action = (isset($_POST['action'])) ? $_POST['action'] : false;
 $error = false;
+$errors = [];
 $processed = false;
-$cInfo = [];
 $theFormats = [
     'YYYY/MM/DD',
     'MM/DD/YYYY',
@@ -32,8 +31,36 @@ $theFormats = [
 
 require 'add_customers_backend.php';
 
+// -----
+// Initialize $cInfo array for single-entry form.
+//
+$default_customer = [
+    'customers_authorization' => '0',
+    'customers_gender' => 'm',
+    'customers_firstname' => '',
+    'customers_lastname' => '',
+    'customers_email_address' => '',
+    'entry_company' => '',
+    'entry_street_address' => '',
+    'entry_suburb' => '',
+    'entry_postcode' => '',
+    'entry_city' => '',
+    'entry_state' => '',
+    'entry_zone_id' => STORE_ZONE,
+    'entry_country_id' => STORE_COUNTRY,
+    'customers_telephone' => '',
+    'customers_fax' => '',
+    'customers_email_format' => (ACCOUNT_EMAIL_PREFERENCE === '0') ? 'TEXT' : 'HTML',
+    'customers_newsletter' => '0',
+    'customers_referral' => '',
+    'customers_group_pricing' => '0',
+];
+$cInfo = new objectInfo($default_customer);
+unset($default_customer);
+
+$action = (isset($_POST['action'])) ? $_POST['action'] : false;
 // ---- Determine what to do next ... single add vs. country change vs. multiple/file add
-if (zen_not_null($action)) {
+if ($action !== false) {
     switch ($action) {
         case 'add_single':
             $array = validate_customer($_POST, 'date_format_s');
@@ -42,7 +69,7 @@ if (zen_not_null($action)) {
 
             if (count($errors) < 1) {
                 $customerName = insert_customer($_POST);
-                $feedback = sprintf( MESSAGE_CUSTOMER_OK, $customerName);
+                $feedback = sprintf(MESSAGE_CUSTOMER_OK, $customerName);
             }
             break;
 
@@ -56,18 +83,24 @@ if (zen_not_null($action)) {
             if (!isset($_POST['resend_id'])) {
                 $errors[] = ERROR_NO_CUSTOMER_SELECTED;
             } else {
-                $sql = "SELECT customers_gender, customers_firstname, customers_lastname, customers_email_address FROM " . TABLE_CUSTOMERS . " WHERE customers_id = '" . (int)$_POST['resend_id'] . "'";
-                $custInfo = $db->Execute($sql);
-                if ($custInfo->RecordCount() == 0) {
+                $custInfo = $db->Execute(
+                    "SELECT customers_gender, customers_firstname, customers_lastname, customers_email_address
+                       FROM " . TABLE_CUSTOMERS . " WHERE customers_id = " . (int)$_POST['resend_id'] . "
+                      LIMIT 1"
+                );
+                if ($custInfo->EOF) {
                     $errors[] = ERROR_NO_CUSTOMER_SELECTED;
                 } else {
                     $thePassword = false;
-                    if (isset($_POST['reset_pw']) && $_POST['reset_pw'] == 1) {
-                        $thePassword = (function_exists('zen_create_PADSS_password')) ? zen_create_PADSS_password((ENTRY_PASSWORD_MIN_LENGTH > 0) ? ENTRY_PASSWORD_MIN_LENGTH : 5) : zen_create_random_value(ENTRY_PASSWORD_MIN_LENGTH);
-                        $sql = "UPDATE " . TABLE_CUSTOMERS . "
+                    if (isset($_POST['reset_pw']) && $_POST['reset_pw'] === '1') {
+                        $thePassword = zen_create_PADSS_password((ENTRY_PASSWORD_MIN_LENGTH > 0) ? ENTRY_PASSWORD_MIN_LENGTH : 5);
+                        $sql = 
+                        $db->Execute(
+                            "UPDATE " . TABLE_CUSTOMERS . "
                                 SET customers_password = '" . zen_encrypt_password($thePassword) . "'
-                                where customers_id = '" . (int)$_POST['resend_id'] . "'";
-                        $db->Execute($sql);
+                              WHERE customers_id = " . (int)$_POST['resend_id'] . "
+                              LIMIT 1"
+                        );
                     }
                     sendWelcomeEmail($custInfo->fields['customers_gender'], $custInfo->fields['customers_firstname'], $custInfo->fields['customers_lastname'], $custInfo->fields['customers_email_address'], $thePassword);
                     $feedback[] = CUSTOMER_EMAIL_RESENT;
@@ -117,10 +150,9 @@ if (isset($feedback) && is_array($feedback) && count($feedback) > 0) {
 }
 
 $insert_mode = (isset($_POST['insert_mode'])) ? $_POST['insert_mode'] : 'file';
-$newsletter_array = [
-    ['id' => '1', 'text' => ENTRY_NEWSLETTER_YES],
-    ['id' => '0', 'text' => ENTRY_NEWSLETTER_NO],
-];
+if ($insert_mode !== 'file' && $insert_mode !== 'part') {
+    $insert_mode = 'file';
+}
 
 if (isset($_POST['date_format_m'])) {
     $selectedDateFormat_m = (int)$_POST['date_format_m'];
@@ -142,85 +174,92 @@ for ($i = 0, $n = count($theFormats), $dateFormats = []; $i < $n; $i++) {
 
 $resendID = (isset($_POST['resend_id'])) ? $_POST['resend_id'] : 0;
 ?>
-    <h1><?php echo HEADING_TITLE; ?></h1>
-    <table border="0" width="100%" cellspacing="2" cellpadding="2">
-        <tr>
-            <td width="100%" valign="top">
-                <table border="0" width="100%" cellspacing="0" cellpadding="2">
-                    <tr>
-                        <td id="multiple"><table border="0" cellspacing="2" cellpadding="2">
-                            <tr>
-                                <td id="csv_in">
-                                    <div class="headingLabel"><?php echo CUSTOMERS_BULK_UPLOAD; ?></div>
+    <div class="container-fluid">
+        <h1><?php echo HEADING_TITLE; ?></h1>
+        <div class="col-md-4">
 <?php
 if ($action == 'add_multiple') {
     echo $infoDivContents;
 }
 ?>
-                                    <?php echo zen_draw_form('customers', FILENAME_ADD_CUSTOMERS, '', 'post', 'enctype="multipart/form-data"') . zen_hide_session_id(). zen_draw_hidden_field( 'action', 'add_multiple'); ?>
-                                    <div class="formArea"><table border="0" cellspacing="2" cellpadding="2">
-                                        <tr>
-                                            <td><div class="back mainLabel"><?php echo CUSTOMERS_FILE_IMPORT; ?></div><input type="file" name="bulk_upload" /></td>
-                                        </tr>
-                                        <tr>
-                                            <td>
-                                                <div class="back mainLabel"><?php echo CUSTOMERS_INSERT_MODE; ?></div>
-                                                <div class="back">
-                                                    <input type="radio" name="insert_mode" value="part" <?php echo ($insert_mode == 'part') ? 'checked="checked"' : ''; ?>/><?php echo CUSTOMERS_INSERT_MODE_VALID; ?><br />
-                                                    <input type="radio" name="insert_mode" value="file" <?php echo ($insert_mode == 'file') ? 'checked="checked"' : ''; ?>/><?php echo CUSTOMERS_INSERT_MODE_FILE; ?>
-                                                </div>
-                                            </td>
-                                        </tr>
-                                        <tr>
-                                            <td><div class="back mainLabel"><?php echo DATE_FORMAT_CHOOSE_MULTI; ?></div><?php echo zen_draw_pull_down_menu('date_format_m', $dateFormats, $selectedDateFormat_m); ?></td>
-                                        </tr>
-                                        <tr>
-                                            <td>
-                                                <div style="width:350px; text-align: right;">
-                                                    <a href="<?php echo HTTP_SERVER . DIR_WS_CATALOG; ?>add_customers_formatting_csv.html" target="_blank"><?php echo FORMATTING_THE_CSV; ?></a>&nbsp;<input type="submit" name="add_customers_in_bulk" value="Upload" />
-                                                </div>
-                                            </td>
-                                        </tr>
-                                    </table></div>
-                                    <?php echo '</form>'; ?>
-                                </td>
-                            </tr>
-
-                            <tr>
-                                <td>
-                                    <div class="headingLabel"><?php echo RESEND_WELCOME_EMAIL; ?></div>
+            <?php echo zen_draw_form('customers', FILENAME_ADD_CUSTOMERS, '', 'post', 'enctype="multipart/form-data" class="form-horizontal"') .
+                       zen_hide_session_id() .
+                       zen_draw_hidden_field( 'action', 'add_multiple'); ?>
+            <div class="row formAreaTitle"><?php echo CUSTOMERS_BULK_UPLOAD; ?></div>
+            <div class="formArea">
+                <div class="form-group">
+                    <?php echo zen_draw_label(CUSTOMERS_FILE_IMPORT, 'bulk_upload', 'class="col-sm-3 control-label"'); ?>
+                    <div class="col-sm-9 col-md-6"><?php echo zen_draw_file_field('bulk_upload', true, 'class="form-control"'); ?></div>
+                </div>
+                <div class="form-group">
+                    <?php echo zen_draw_label(CUSTOMERS_INSERT_MODE, 'insert_mode', 'class="col-sm-3 control-label"'); ?>
+                    <div class="col-sm-9 col-md-6">
+                        <label class="radio-inline"><?php echo zen_draw_radio_field('insert_mode', 'part', $insert_mode === 'part') . CUSTOMERS_INSERT_MODE_VALID; ?></label>
+                        <label class="radio-inline"><?php echo zen_draw_radio_field('insert_mode', 'file', $insert_mode === 'file') . CUSTOMERS_INSERT_MODE_FILE; ?></label>
+                    </div>
+                </div>
+                <div class="form-group">
+                    <?php echo zen_draw_label(DATE_FORMAT_CHOOSE_MULTI, 'date_format_m', 'class="col-sm-3 control-label"'); ?>
+                    <div class="col-sm-9 col-md-6">
+                        <?php echo zen_draw_pull_down_menu('date_format_m', $dateFormats, $selectedDateFormat_m); ?>
+                    </div>
+                </div>
+                <div class="row text-right">
+                    <button name="add_customers_in_bulk" type="submit" class="btn btn-primary"><?php echo IMAGE_UPLOAD; ?></button>
+                </div>
+<?php
+/*
+                        <tr>
+                            <td>
+                                <div style="width:350px; text-align: right;">
+                                    <a href="<?php echo HTTP_SERVER . DIR_WS_CATALOG; ?>add_customers_formatting_csv.html" target="_blank"><?php echo FORMATTING_THE_CSV; ?></a>&nbsp;<input type="submit" name="add_customers_in_bulk" value="Upload" />
+                                </div>
+                            </td>
+                        </tr>
+*/
+?>
+            </div>
+            <?php echo '</form>'; ?>
 <?php
 if ($action == 'resend_email') {
     echo $infoDivContents;
 }
 ?>
-                                    <?php echo zen_draw_form('resend', FILENAME_ADD_CUSTOMERS, '', 'post', 'enctype="multipart/form-data"') . zen_hide_session_id() . zen_draw_hidden_field ('action', 'resend_email'); ?>
-                                    <div class="formArea"><table border="0" cellspacing="2" cellpadding="2">
-                                        <tr>
-                                            <td><div class="back mainLabel"><?php echo TEXT_CHOOSE_CUSTOMER; ?></div><div class="main"><?php echo zen_draw_pull_down_menu('resend_id', create_customer_drop_down(), $resendID); ?></div></td>
-                                        </tr>
-                                        <tr class="clearBoth">
-                                            <td><div class="back mainLabel"><?php echo TEXT_RESET_PASSWORD; ?></div><div class="main"><input type="checkbox" id="reset_pw" value="1" name="reset_pw" <?php echo (isset($_POST['reset_pw'])) ? 'checked="checked"' : ''; ?>/></div></td>
-                                        </tr>
-                                        <tr>
-                                            <td>
-                                                <div style="width:350px; text-align: right;">
-                                                    <input type="submit" name="resend" value="<?php echo BUTTON_RESEND; ?>" />
-                                                </div>
-                                            </td>
-                                        </tr>
-                                    </table></div>
-                                    <?php echo '</form>'; ?>
-                                </td>
-                            </tr>
-                        </table></td>
+            <?php echo zen_draw_form('resend', FILENAME_ADD_CUSTOMERS, '', 'post', 'enctype="multipart/form-data" class="form-horizontal"') .
+                  zen_hide_session_id() .
+                  zen_draw_hidden_field('action', 'resend_email'); ?>
+            <div class="row formAreaTitle"><?php echo RESEND_WELCOME_EMAIL; ?></div>
+            <div class="formArea">
+                <div class="form-group">
+                    <?php echo zen_draw_label(TEXT_CHOOSE_CUSTOMER, 'resend_id', 'class="col-sm-4 control-label"'); ?>
+                    <div class="col-sm-8 col-md-6"><?php echo zen_draw_pull_down_menu('resend_id', create_customer_drop_down(), $resendID); ?></div>
+                </div>
+                <div class="form-group">
+                    <?php echo zen_draw_label(TEXT_RESET_PASSWORD, 'reset_pw', 'class="col-sm-4 control-label"'); ?>
+                    <div class="col-sm-8 col-md-6">
+                        <?php echo zen_draw_checkbox_field('reset_pw', '1', isset($_POST['reset_pw']), 'class="form-control"'); ?>
+                    </div>
+                </div>
+                <div class="row text-right">
+                    <button name="resend" type="submit" class="btn btn-primary"><?php echo BUTTON_RESEND; ?></button>
+                </div>
+            </div>
+            <?php echo '</form>'; ?>
+        </div>
+        
+        <div class="col-md-8">
+<?php
+if ($action === 'add_single' && isset($_POST['insert_y'])) {
+    echo $infoDivContents;
+}
+?>
+            <?php echo zen_draw_form('customers_1', FILENAME_ADD_CUSTOMERS, '', 'post', 'class="form-horizontal"') .
+                       zen_hide_session_id() .
+                       zen_draw_hidden_field('action', 'add_single'); ?>
 
-                        <td id="single"><div class="headingLabel"><?php echo CUSTOMERS_SINGLE_ENTRY; ?></div><?php if ($action == 'add_single' && isset($_POST['insert_y'])) echo $infoDivContents; ?><?php echo zen_draw_form('customers_1', FILENAME_ADD_CUSTOMERS, '', 'post') . zen_hide_session_id() . zen_draw_hidden_field( 'action', 'add_single'); ?><table border="0" width="100%" cellspacing="0" cellpadding="0">
-                            <tr>
-                                <td class="formAreaTitle"><?php echo CATEGORY_PERSONAL; ?></td>
-                            </tr>
-                            <tr>
-                                <td class="formArea"><table border="0" cellspacing="2" cellpadding="2">
+            <div class="row formAreaTitle"><?php echo CUSTOMERS_SINGLE_ENTRY; ?></div>
+            <div class="formArea">
+                <div class="row formAreaTitle"><?php echo CATEGORY_PERSONAL; ?></div>
 <?php
 $customers_authorization_array = [
     ['id' => '0', 'text' => CUSTOMERS_AUTHORIZATION_0],
@@ -229,209 +268,218 @@ $customers_authorization_array = [
     ['id' => '3', 'text' => CUSTOMERS_AUTHORIZATION_3],
 ];
 ?>
-                                    <tr>
-                                        <td class="main mainLabel"><?php echo CUSTOMERS_AUTHORIZATION; ?></td>
-                                        <td class="main"><?php echo zen_draw_pull_down_menu('customers_authorization', $customers_authorization_array, $cInfo->customers_authorization); ?></td>
-                                    </tr>
+                <div class="formArea">
+                    <div class="form-group">
+                        <?php echo zen_draw_label(CUSTOMERS_AUTHORIZATION, 'customers_authorization', 'class="col-sm-3 control-label"'); ?>
+                        <div class="col-sm-9 col-md-6">
+                            <?php echo zen_draw_pull_down_menu('customers_authorization', $customers_authorization_array, $cInfo->customers_authorization, 'class="form-control"'); ?>
+                        </div>
+                    </div>
 <?php
-if (ACCOUNT_GENDER == 'true') {
+if (ACCOUNT_GENDER === 'true') {
 ?>
-                                    <tr>
-                                        <td class="main mainLabel" style="vertical-align:top;"><?php echo ENTRY_GENDER; ?></td>
-                                        <td class="main">
-                                            <input type="radio" name="customers_gender" value="m" <?php echo ($cInfo->customers_gender == 'm') ? 'checked' : ''; ?> /><?php echo MALE; ?>
-                                            <span class="spacer"></span>
-                                            <input type="radio" name="customers_gender" value="f" <?php echo ($cInfo->customers_gender == 'f') ? 'checked' : ''; ?> /><?php echo FEMALE; ?>
-                                        </td>
-                                    </tr>
+                    <div class="form-group">
+                        <?php echo zen_draw_label(ENTRY_GENDER, 'customers_gender', 'class="col-sm-3 control-label"'); ?>
+                        <div class="col-sm-9 col-md-6">
+                            <label class="radio-inline"><?php echo zen_draw_radio_field('customers_gender', 'part', $cInfo->customers_gender === 'm') . MALE; ?></label>
+                            <label class="radio-inline"><?php echo zen_draw_radio_field('customers_gender', 'file', $cInfo->customers_gender === 'f') . FEMALE; ?></label>
+                        </div>
+                    </div>
 <?php
 }
 ?>
-                                    <tr>
-                                        <td class="main mainLabel"><?php echo ENTRY_FIRST_NAME; ?></td>
-                                        <td class="main"><input size="30" name="customers_firstname" value="<?php echo $cInfo->customers_firstname; ?>" /></td>
-                                    </tr>
+                    <div class="form-group">
+                        <?php echo zen_draw_label(ENTRY_FIRST_NAME, 'customers_firstname', 'class="col-sm-3 control-label"'); ?>
+                        <div class="col-sm-9 col-md-6">
+                            <?php echo zen_draw_input_field('customers_firstname', htmlspecialchars($cInfo->customers_firstname, ENT_COMPAT, CHARSET, TRUE), zen_set_field_length(TABLE_CUSTOMERS, 'customers_firstname', 50) . ' class="form-control"', true); ?>
+                        </div>
+                    </div>
+                    <div class="form-group">
+                        <?php echo zen_draw_label(ENTRY_LAST_NAME, 'customers_lastname', 'class="col-sm-3 control-label"'); ?>
+                        <div class="col-sm-9 col-md-6">
+                            <?php echo zen_draw_input_field('customers_lastname', htmlspecialchars($cInfo->customers_lastname, ENT_COMPAT, CHARSET, TRUE), zen_set_field_length(TABLE_CUSTOMERS, 'customers_lastname', 50) . ' class="form-control"', true); ?>
+                        </div>
+                    </div>
+<?php
+if (ACCOUNT_DOB === 'true') {
+?>
+                    <div class="form-group">
+                        <?php echo zen_draw_label(DATE_FORMAT_CHOOSE_SINGLE, 'date_format_s', 'class="col-sm-3 control-label"'); ?>
+                        <div class="col-sm-9 col-md-6">
+                            <?php echo zen_draw_pull_down_menu('date_format_s', $dateFormats, $selectedDateFormat_s, 'class="form-control"'); ?>
+                        </div>
+                    </div>
+                    <div class="form-group">
+                        <?php echo zen_draw_label(ENTRY_DATE_OF_BIRTH, 'customers_dob', 'class="col-sm-3 control-label"'); ?>
+                        <div class="col-sm-9 col-md-6">
+                            <?php echo zen_draw_input_field('customers_dob', ((empty($cInfo->customers_dob) || $cInfo->customers_dob <= '0001-01-01' || $cInfo->customers_dob == '0001-01-01 00:00:00') ? '' : zen_date_short($cInfo->customers_dob)), 'maxlength="10" class="form-control"', true); ?>
+                        </div>
+                    </div>
 
-                                    <tr>
-                                        <td class="main mainLabel"><?php echo ENTRY_LAST_NAME; ?></td>
-                                        <td class="main"><input size="30" name="customers_lastname" value="<?php echo $cInfo->customers_lastname; ?>" /></td>
-                                    </tr>
-<?php
-if (ACCOUNT_DOB == 'true') {
-?>
-                                    <tr>
-                                        <td class="back mainLabel"><?php echo DATE_FORMAT_CHOOSE_SINGLE; ?></td>
-                                        <td class="main"><?php echo zen_draw_pull_down_menu('date_format_s', $dateFormats, $selectedDateFormat_s); ?></td>
-                                    </tr>
-                                    <tr>
-                                        <td class="main mainLabel"><?php echo ENTRY_DATE_OF_BIRTH; ?></td>
-                                        <td class="main"><input size="30" name="customers_dob" value="<?php echo $cInfo->customers_dob; ?>" /></td>
-                                    </tr>
 <?php
 }
 ?>
-                                    <tr>
-                                        <td class="main mainLabel"><?php echo ENTRY_EMAIL_ADDRESS; ?></td>
-                                        <td class="main"><input size="30" name="customers_email_address" value="<?php echo $cInfo->customers_email_address; ?>" /></td>
-                                    </tr> 
-                                </table></td>
-                            </tr>
+                    <div class="form-group">
+                        <?php echo zen_draw_label(ENTRY_EMAIL_ADDRESS, 'customers_email_address', 'class="col-sm-3 control-label"'); ?>
+                        <div class="col-sm-9 col-md-6">
+                            <?php echo zen_draw_input_field('customers_email_address', htmlspecialchars($cInfo->customers_email_address, ENT_COMPAT, CHARSET, TRUE), zen_set_field_length(TABLE_CUSTOMERS, 'customers_email_address', 50) . ' class="form-control"', true); ?>
+                        </div>
+                    </div>
+                </div>
 <?php
-if (ACCOUNT_COMPANY == 'true') {
+if (ACCOUNT_COMPANY === 'true') {
 ?>
-                            <tr><td><?php echo zen_draw_separator('pixel_trans.gif', '1', '10'); ?></td></tr>
-                            <tr><td class="formAreaTitle"><?php echo CATEGORY_COMPANY; ?></td></tr>
-                            <tr>
-                                <td class="formArea"><table border="0" cellspacing="2" cellpadding="2">
-                                    <tr>
-                                        <td class="main mainLabel"><?php echo ENTRY_COMPANY; ?></td>
-                                        <td class="main"><input size="30" name="entry_company" value="<?php echo $cInfo->entry_company; ?>" /></td>
-                                    </tr>
-                                </table></td>
-                            </tr>
-<?php
-}
-?>
-                            <tr><td><?php echo zen_draw_separator('pixel_trans.gif', '1', '10'); ?></td></tr>
-                            <tr><td class="formAreaTitle"><?php echo CATEGORY_ADDRESS; ?></td></tr>
-                            <tr>
-                                <td class="formArea"><table border="0" cellspacing="2" cellpadding="2">
-                                    <tr>
-                                        <td class="main mainLabel"><?php echo ENTRY_STREET_ADDRESS; ?></td>
-                                        <td class="main"><input size="30" name="entry_street_address" value="<?php echo $cInfo->entry_street_address; ?>" /></td>
-                                    </tr>
-<?php
-if (ACCOUNT_SUBURB == 'true') {
-?>
-                                    <tr>
-                                        <td class="main mainLabel"><?php echo ENTRY_SUBURB; ?></td>
-                                        <td class="main"><input size="30" name="entry_suburb" value="<?php echo $cInfo->entry_suburb; ?>" /></td>
-                                    </tr>
+                <div class="row formAreaTitle"><?php echo CATEGORY_COMPANY; ?></div>
+                <div class="formArea">
+                    <div class="form-group">
+                        <?php echo zen_draw_label(ENTRY_COMPANY, 'customers_email_address', 'class="col-sm-3 control-label"'); ?>
+                        <div class="col-sm-9 col-md-6">
+                            <?php echo zen_draw_input_field('entry_company', htmlspecialchars($cInfo->entry_company, ENT_COMPAT, CHARSET, TRUE), zen_set_field_length(TABLE_ADDRESS_BOOK, 'entry_company', 50) . ' class="form-control"'); ?>
+                        </div>
+                    </div>
+                </div>
 <?php
 }
 ?>
-                                    <tr>
-                                        <td class="main mainLabel"><?php echo ENTRY_CITY; ?></td>
-                                        <td class="main"><input size="30" name="entry_city" value="<?php echo $cInfo->entry_city; ?>" /></td>
-                                    </tr>
+                <div class="row formAreaTitle"><?php echo CATEGORY_ADDRESS; ?></div>
+                <div class="formArea">
+                    <div class="form-group">
+                        <?php echo zen_draw_label(ENTRY_STREET_ADDRESS, 'entry_street_address', 'class="col-sm-3 control-label"'); ?>
+                        <div class="col-sm-9 col-md-6">
+                            <?php echo zen_draw_input_field('entry_street_address', htmlspecialchars($cInfo->entry_street_address, ENT_COMPAT, CHARSET, TRUE), zen_set_field_length(TABLE_ADDRESS_BOOK, 'entry_street_address', 50) . ' class="form-control"', true); ?>
+                        </div>
+                    </div>
+<?php
+if (ACCOUNT_SUBURB === 'true') {
+?>
+                    <div class="form-group">
+                        <?php echo zen_draw_label(ENTRY_SUBURB, 'suburb', 'class="col-sm-3 control-label"'); ?>
+                        <div class="col-sm-9 col-md-6">
+                            <?php echo zen_draw_input_field('entry_suburb', htmlspecialchars($cInfo->entry_suburb, ENT_COMPAT, CHARSET, TRUE), zen_set_field_length(TABLE_ADDRESS_BOOK, 'entry_suburb', 50) . ' class="form-control"'); ?>
+                        </div>
+                    </div>
+<?php
+}
+?>
+                    <div class="form-group">
+                        <?php echo zen_draw_label(ENTRY_POST_CODE, 'entry_postcode', 'class="col-sm-3 control-label"'); ?>
+                        <div class="col-sm-9 col-md-6">
+                            <?php echo zen_draw_input_field('entry_postcode', htmlspecialchars($cInfo->entry_postcode, ENT_COMPAT, CHARSET, TRUE), zen_set_field_length(TABLE_ADDRESS_BOOK, 'entry_postcode', 10) . ' class="form-control"', true); ?>
+                        </div>
+                    </div>
+                    <div class="form-group">
+                        <?php echo zen_draw_label(ENTRY_CITY, 'entry_city', 'class="col-sm-3 control-label"'); ?>
+                        <div class="col-sm-9 col-md-6">
+                            <?php echo zen_draw_input_field('entry_city', htmlspecialchars($cInfo->entry_city, ENT_COMPAT, CHARSET, TRUE), zen_set_field_length(TABLE_ADDRESS_BOOK, 'entry_city', 50) . ' class="form-control"', true); ?>
+                        </div>
+                    </div>
+<?php
+if (ACCOUNT_STATE === 'true') {
+?>
+                    <div class="form-group">
+                        <?php echo zen_draw_label(ENTRY_STATE, 'entry_state', 'class="col-sm-3 control-label"'); ?>
+                        <div class="col-sm-9 col-md-6">
+                            <?php echo zen_draw_input_field('entry_state', htmlspecialchars(zen_get_zone_name($cInfo->entry_country_id, $cInfo->entry_zone_id, $cInfo->entry_state), ENT_COMPAT, CHARSET, TRUE), 'class="form-control"'); ?>
+                        </div>
+                    </div>
+<?php
+}
+?>
+                    <div class="form-group">
+                        <?php echo zen_draw_label(ENTRY_COUNTRY, 'entry_country_id', 'class="col-sm-3 control-label"'); ?>
+                        <div class="col-sm-9 col-md-6">
+                            <?php echo zen_draw_pull_down_menu('entry_country_id', zen_get_countries(), $cInfo->entry_country_id, 'class="form-control"'); ?>
+                        </div>
+                    </div>
+                </div>
 
-                                    <tr>
-                                        <td class="main mainLabel"><?php echo ENTRY_POST_CODE; ?></td>
-                                        <td class="main"><input size="30" name="entry_postcode" value="<?php echo $cInfo->entry_postcode; ?>" /></td>
-                                    </tr>
-
-                                    <tr>
-                                        <td class="main mainLabel"><?php echo ENTRY_COUNTRY; ?></td>
-                                        <td class="main"><?php echo zen_draw_pull_down_menu('entry_country_id', zen_get_countries(), (zen_not_null($cInfo->entry_country_id) ? $cInfo->entry_country_id : SHOW_CREATE_ACCOUNT_DEFAULT_COUNTRY), 'onchange="this.form.submit();"'); ?></td>
-                                    </tr>
+                <div class="row formAreaTitle"><?php echo CATEGORY_CONTACT; ?></div>
+                <div class="formArea">
+                    <div class="form-group">
+                        <?php echo zen_draw_label(ENTRY_TELEPHONE_NUMBER, 'customers_telephone', 'class="col-sm-3 control-label"'); ?>
+                        <div class="col-sm-9 col-md-6">
+                            <?php echo zen_draw_input_field('customers_telephone', htmlspecialchars($cInfo->customers_telephone, ENT_COMPAT, CHARSET, TRUE), zen_set_field_length(TABLE_CUSTOMERS, 'customers_telephone', 15) . ' class="form-control"', true); ?>
+                        </div>
+                    </div>
 <?php
-if (ACCOUNT_STATE == 'true') {
+if (ACCOUNT_FAX_NUMBER === 'true') {
 ?>
-                                    <tr>
-                                        <td class="main mainLabel"><?php echo ENTRY_STATE; ?></td>
-                                        <td class="main">
-<?php
-    $theZones = zen_prepare_country_zones_pull_down ((zen_not_null($cInfo->entry_country_id) ? $cInfo->entry_country_id : SHOW_CREATE_ACCOUNT_DEFAULT_COUNTRY));
-    if (count($theZones) > 1) {
-        echo zen_draw_pull_down_menu('entry_zone_id', $theZones, $cInfo->entry_zone_id);
-    } else {
-        $entry_state = zen_get_zone_name($cInfo->entry_country_id, $cInfo->entry_zone_id, $cInfo->entry_state);
-        echo zen_draw_input_field('entry_state', zen_get_zone_name($cInfo->entry_country_id, $cInfo->entry_zone_id, $cInfo->entry_state));
-    }
-}
-?>
-                                        </td>
-                                    </tr>
-                                </table></td>
-                            </tr>
-
-                            <tr><td><?php echo zen_draw_separator('pixel_trans.gif', '1', '10'); ?></td></tr>
-                            <tr><td class="formAreaTitle"><?php echo CATEGORY_CONTACT; ?></td></tr>
-                            <tr>
-                                <td class="formArea"><table border="0" cellspacing="2" cellpadding="2">
-                                    <tr>
-                                        <td class="main mainLabel"><?php echo ENTRY_TELEPHONE_NUMBER; ?></td>
-                                        <td class="main"><input size="30" name="customers_telephone" value="<?php echo $cInfo->customers_telephone; ?>" /></td>
-                                    </tr>
-<?php
-if (ACCOUNT_FAX_NUMBER == 'true') {
-?>
-                                    <tr>
-                                        <td class="main mainLabel"><?php echo ENTRY_FAX_NUMBER; ?></td>
-                                        <td class="main"><input size="30" name="customers_fax" value="<?php echo $cInfo->customers_fax; ?>" /></td>
-                                    </tr>
+                    <div class="form-group">
+                        <?php echo zen_draw_label(ENTRY_FAX_NUMBER, 'customers_fax', 'class="col-sm-3 control-label"'); ?>
+                        <div class="col-sm-9 col-md-6">
+                            <?php echo zen_draw_input_field('customers_fax', htmlspecialchars($cInfo->customers_fax, ENT_COMPAT, CHARSET, TRUE), zen_set_field_length(TABLE_CUSTOMERS, 'customers_fax', 15) . ' class="form-control"'); ?>
+                        </div>
+                    </div>
 <?php
 }
 ?>
-                                </table></td>
-                            </tr>
-
-                            <tr><td><?php echo zen_draw_separator('pixel_trans.gif', '1', '10'); ?></td></tr>
-                            <tr><td class="formAreaTitle"><?php echo CATEGORY_OPTIONS; ?></td></tr>
-                            <tr>
-                                <td class="formArea"><table border="0" cellspacing="2" cellpadding="2">
-                                    <tr>
-                                        <td class="main mainLabel"><?php echo ENTRY_EMAIL_PREFERENCE; ?></td>
-                                        <td class="main">
+                </div>
+                
+                <div class="row formAreaTitle"><?php echo CATEGORY_OPTIONS; ?></div>
+                <div class="formArea">
+                    <div class="form-group">
+                        <?php echo zen_draw_label(ENTRY_EMAIL_PREFERENCE, 'customers_email_format', 'class="col-sm-3 control-label"'); ?>
+                        <div class="col-sm-9 col-md-6">
+                            <label class="radio-inline"><?php echo zen_draw_radio_field('customers_email_format', 'HTML', $cInfo->customers_email_format !== 'TEXT') . ENTRY_EMAIL_HTML_DISPLAY; ?></label>
+                            <label class="radio-inline"><?php echo zen_draw_radio_field('customers_email_format', 'TEXT', $cInfo->customers_email_format === 'TEXT') . ENTRY_EMAIL_TEXT_DISPLAY; ?></label>
+                        </div>
+                    </div>
+                    <div class="form-group">
+                        <?php echo zen_draw_label(ENTRY_NEWSLETTER, 'customers_newsletter', 'class="col-sm-3 control-label"'); ?>
+                        <div class="col-sm-9 col-md-6">
 <?php
-$email_pref_text = ((empty($cInfo) && ACCOUNT_EMAIL_PREFERENCE != '1') || $cInfo->customers_email_format == 'TEXT' ) ? true : false;
-$email_pref_html = !$email_pref_text;
-echo zen_draw_radio_field('customers_email_format', 'HTML', $email_pref_html) . '&nbsp;' . ENTRY_EMAIL_HTML_DISPLAY . '&nbsp;&nbsp;&nbsp;' . zen_draw_radio_field('customers_email_format', 'TEXT', $email_pref_text) . '&nbsp;' . ENTRY_EMAIL_TEXT_DISPLAY;
+$newsletter_array = [
+    ['id' => '1', 'text' => ENTRY_NEWSLETTER_YES],
+    ['id' => '0', 'text' => ENTRY_NEWSLETTER_NO],
+];
+$newsletter =  ((empty($cInfo) && ACCOUNT_NEWSLETTER_STATUS === '2') || (isset($cInfo) && $cInfo->customers_newsletter === '1')) ? '1' : '0';
+echo zen_draw_pull_down_menu('customers_newsletter', $newsletter_array, $newsletter, 'class="form-control"');
 ?>
-                                        </td>
-                                    </tr>
-          
-                                    <tr>
-                                        <td class="main mainLabel"><?php echo ENTRY_NEWSLETTER; ?></td>
+                        </div>
+                    </div>
+                    <div class="form-group">
+                        <?php echo zen_draw_label(ENTRY_PRICING_GROUP, 'customers_group_pricing', 'class="col-sm-3 control-label"'); ?>
+                        <div class="col-sm-9 col-md-6">
 <?php
-$newsletter =  ((empty($cInfo) && ACCOUNT_NEWSLETTER_STATUS == '2') || (isset($cInfo) && $cInfo->customers_newsletter == '1')) ? '1' : '0';
-?>
-                                        <td class="main"><?php echo zen_draw_pull_down_menu('customers_newsletter', $newsletter_array, /*v2.0.4c*/ $newsletter); ?></td>
-                                    </tr>
-          
-                                    <tr>
-                                        <td class="main mainLabel"><?php echo ENTRY_PRICING_GROUP; ?></td>
-                                        <td class="main">
-<?php
-$group_array_query = $db->execute("select group_id, group_name, group_percentage from " . TABLE_GROUP_PRICING);
-$group_array[] = ['id' => 0, 'text' => TEXT_NONE];
-
-while (!$group_array_query->EOF) {
-    $group_array[] = ['id' => $group_array_query->fields['group_id'], 'text' => $group_array_query->fields['group_name'] . '&nbsp;' . $group_array_query->fields['group_percentage'] . '%'];
-    $group_array_query->MoveNext();
+$group_array_query = $db->Execute(
+    "SELECT group_id, group_name, group_percentage
+      FROM " . TABLE_GROUP_PRICING
+);
+$group_array[] = array('id' => 0, 'text' => TEXT_NONE);
+foreach ($group_array_query as $item) {
+    $group_array[] = ['id' => $item['group_id'], 'text' => $item['group_name'] . '&nbsp;' . $item['group_percentage'] . '%'];
 }
-
-echo zen_draw_pull_down_menu('customers_group_pricing', $group_array, $cInfo->customers_group_pricing);
+echo zen_draw_pull_down_menu('customers_group_pricing', $group_array, $cInfo->customers_group_pricing, 'class="form-control"');
 ?>
-                                        </td>
-                                    </tr>
+                        </div>
+                    </div>
 <?php
-if (CUSTOMERS_REFERRAL_STATUS == 2) {
+if (CUSTOMERS_REFERRAL_STATUS === '2') {
 ?>
-                                    <tr>
-                                        <td class="main mainLabel"><?php echo CUSTOMERS_REFERRAL; ?></td>
-                                        <td class="main"><?php echo zen_draw_input_field('customers_referral', $cInfo->customers_referral, zen_set_field_length(TABLE_CUSTOMERS, 'customers_referral', 15)); ?></td>
-                                    </tr>
+                    <div class="form-group">
+                        <?php echo zen_draw_label(CUSTOMERS_REFERRAL, 'customers_referral', 'class="col-sm-3 control-label"'); ?>
+                        <div class="col-sm-9 col-md-6">
+                            <?php echo zen_draw_input_field('customers_referral', htmlspecialchars($cInfo->customers_referral, ENT_COMPAT, CHARSET, TRUE), zen_set_field_length(TABLE_CUSTOMERS, 'customers_referral', 15) . ' class="form-control"'); ?>
+                        </div>
+                    </div>
 <?php
 }
 ?>
-                                    <tr>
-                                        <td class="main mainLabel"><?php echo ENTRY_EMAIL; ?></td>
-                                        <td class="main"><input type="checkbox" id="send_welcome" value="1" name="send_welcome" <?php echo (isset($_POST['send_welcome'])) ? 'checked="checked"' : ''; ?>/></td>
-                                    </tr>
-                                </table></td>
-                            </tr>
-        
-                            <tr><td><?php echo zen_draw_separator('pixel_trans.gif', '1', '10'); ?></td></tr>
-                            <tr>
-                                <td align="right" class="main"><?php echo zen_image_submit('button_insert.gif', IMAGE_UPDATE, 'name="insert"'); ?><a href="<?php echo zen_href_link(FILENAME_CUSTOMERS, zen_get_all_get_params(array('action')), 'NONSSL'); ?>"><?php echo zen_image_button('button_cancel.gif', IMAGE_CANCEL); ?></a></td>
-                            </tr>
-                        </table></form></td>
-                    </tr>
-                </table>
-            </td>
-        </tr>
-    </table>
+                    <div class="form-group">
+                        <?php echo zen_draw_label(ENTRY_EMAIL, 'send_welcome', 'class="col-sm-3 control-label"'); ?>
+                        <div class="col-sm-9 col-md-6">
+                            <?php echo zen_draw_checkbox_field('send_welcome', '1', isset($_POST['send_welcome']), 'class="form-control"'); ?>
+                        </div>
+                    </div>
+                </div>
+                <div class="row"><?php echo zen_draw_separator('pixel_trans.gif', '1', '10'); ?></div>
+                <div class="row text-right">
+                    <button name="insert" type="submit" class="btn btn-primary"><?php echo IMAGE_UPDATE; ?></button>
+                </div>
+            </div>
+            <?php echo '</form>'; ?>
+        </div>
+    </div>
 <?php
 require DIR_WS_INCLUDES . 'footer.php';
 ?>
