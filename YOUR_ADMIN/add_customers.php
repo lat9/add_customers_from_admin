@@ -18,18 +18,11 @@ $currencies = new currencies();
 $error = false;
 $errors = [];
 $processed = false;
-$theFormats = [
-    'YYYY/MM/DD',
-    'MM/DD/YYYY',
-    'YYYY-MM-DD',
-    'MM-DD-YYYY',
-    'YYYY/DD/MM',
-    'DD/MM/YYYY',
-    'YYYY-DD-MM',
-    'DD-MM-YYYY'
-];
 
 require DIR_WS_CLASSES . 'addCustomers.php';
+$acfa = new addCustomers();
+
+$theFormats = $acfa->getDateFormats();
 
 // -----
 // Initialize $cInfo array for single-entry form.
@@ -58,34 +51,47 @@ $default_customer = [
 $cInfo = new objectInfo($default_customer);
 unset($default_customer);
 
+// -----
+// Determine what to do next, based on the posted 'action'.
+//
 $action = (isset($_POST['action'])) ? $_POST['action'] : false;
-// ---- Determine what to do next ... single add vs. country change vs. multiple/file add
 if ($action !== false) {
     switch ($action) {
+        // -----
+        // Adding a single-customer via the associated form.  The input is validated and,
+        // if found to be OK, subsequently written to the database.
+        //
         case 'add_single':
-            $array = validate_customer($_POST, 'date_format_s');
-            $errors = $array['errors'];
-            $cInfo = $array['cInfo'];
-
-            if (count($errors) < 1) {
-                $customerName = insert_customer($_POST);
-                $feedback = sprintf(MESSAGE_CUSTOMER_OK, $customerName);
+            list($cInfo, $errors) = $acfa->validateCustomer($_POST, 'date_format_s');
+            if (count($errors) === 0) {
+                $customerName = $acfa->insertCustomer($_POST);
+                $messageStack->add_session(sprintf(MESSAGE_CUSTOMER_OK, $customerName), 'success');
+                zen_redirect(zen_href_link(FILENAME_ADD_CUSTOMERS));
             }
             break;
 
+        // -----
+        // Adding multiple customers, via an uploaded .csv/.txt file.
+        //
         case 'add_multiple':
-            $array = check_file_upload();
-            $errors = $array['errors'];
-            $feedback = $array['feedback'];
+            $errors = $acfa->checkFileUpload();
+            if (count($errors) === 0) {
+                $messageStack->add_session(sprintf(MESSAGE_CUSTOMERS_OK, $acfa->getCustomersInserted()), 'success');
+                zen_redirect(zen_href_link(FILENAME_ADD_CUSTOMERS));
+            }
             break;
 
+        // -----
+        // Resending the customer's welcome-email, optionally resetting their password.
+        //
         case 'resend_email':
             if (!isset($_POST['resend_id'])) {
                 $errors[] = ERROR_NO_CUSTOMER_SELECTED;
             } else {
                 $custInfo = $db->Execute(
                     "SELECT customers_gender, customers_firstname, customers_lastname, customers_email_address
-                       FROM " . TABLE_CUSTOMERS . " WHERE customers_id = " . (int)$_POST['resend_id'] . "
+                       FROM " . TABLE_CUSTOMERS . "
+                      WHERE customers_id = " . (int)$_POST['resend_id'] . "
                       LIMIT 1"
                 );
                 if ($custInfo->EOF) {
@@ -93,8 +99,7 @@ if ($action !== false) {
                 } else {
                     $thePassword = false;
                     if (isset($_POST['reset_pw']) && $_POST['reset_pw'] === '1') {
-                        $thePassword = zen_create_PADSS_password((ENTRY_PASSWORD_MIN_LENGTH > 0) ? ENTRY_PASSWORD_MIN_LENGTH : 5);
-                        $sql = 
+                        $thePassword = zen_create_PADSS_password(((int)ENTRY_PASSWORD_MIN_LENGTH > 0) ? (int)ENTRY_PASSWORD_MIN_LENGTH : 5);
                         $db->Execute(
                             "UPDATE " . TABLE_CUSTOMERS . "
                                 SET customers_password = '" . zen_encrypt_password($thePassword) . "'
@@ -102,12 +107,16 @@ if ($action !== false) {
                               LIMIT 1"
                         );
                     }
-                    sendWelcomeEmail($custInfo->fields['customers_gender'], $custInfo->fields['customers_firstname'], $custInfo->fields['customers_lastname'], $custInfo->fields['customers_email_address'], $thePassword);
-                    $feedback[] = CUSTOMER_EMAIL_RESENT;
+                    $acfa->sendWelcomeEmail($custInfo->fields['customers_gender'], $custInfo->fields['customers_firstname'], $custInfo->fields['customers_lastname'], $custInfo->fields['customers_email_address'], $thePassword);
+                    $messageStack->add_session(CUSTOMER_EMAIL_RESENT . ' ' . $custInfo->fields['customers_firstname'] . ' ' . $custInfo->fields['customers_lastname'] . ' (' . $custInfo->fields['customers_email_address'] . ')', 'success');
+                    zen_redirect(zen_href_link(FILENAME_ADD_CUSTOMERS));
                 }
             }
             break;
 
+        // -----
+        // Anything else, nothing to be done.
+        //
         default:
             break;
     }
@@ -125,26 +134,18 @@ require DIR_WS_INCLUDES . 'header.php';
 
 $infoDivContents = '';
 if (count($errors) > 0) {
-    $infoDivContents = '<div class="errorDiv"><p class="errorBold">' . ERROR_CUSTOMER_ERROR_1 . (($action == 'insert_multiple' && zen_not_null($_FILES['bulk_upload']['name'])) ? (' (' . $_FILES['bulk_upload']['name'] . ')') : '') . ':' . '</p><ul>';
+    $infoDivContents = '<div class="errorDiv"><p class="errorBold">' . ERROR_CUSTOMER_ERROR_1 . (($action == 'insert_multiple' && !empty($_FILES['bulk_upload']['name'])) ? (' (' . $_FILES['bulk_upload']['name'] . ')') : '') . ':' . '</p><ul>';
 
     foreach ($errors as $line_no => $error) {
         if (is_array($error)) {
-            $infoDivContents .= '<div class="error">' . sprintf(ERROR_ON_LINE, ($line_no+1)) . '</div><ul>';
+            $infoDivContents .= '<div class="error">' . sprintf(ERROR_ON_LINE, $line_no) . '</div><ul>';
             foreach ($error as $err) {
-                $infoDivContents .= '<li class="error">' . $err. '</li>';
+                $infoDivContents .= '<li class="error">' . $err . '</li>';
             }
             $infoDivContents .= '</ul>';
         } else {
             $infoDivContents .= '<li class="error">' . $error . '</li>';
         }
-    }
-    $infoDivContents .= '</ul></div>';
-}
-
-if (isset($feedback) && is_array($feedback) && count($feedback) > 0) {
-    $infoDivContents .= '<div class="okDiv"><p class="okBold">' . ((count($errors) && $_POST['insert_mode'] == 'file') ? MESSAGE_LINES_OK_NOT_INSERTED : MESSAGE_CUSTOMERS_OK) . '</p><ul>';
-    foreach ($feedback as $line_no=>$feedback_msg) {
-        $infoDivContents .= '<li class="ok">' . (($feedback_msg != '' && !is_array($feedback_msg)) ? $feedback_msg : sprintf(LINE_MSG, $line_no+1, $feedback_msg['customers_firstname'], $feedback_msg['customers_lastname'])) . '</li>';
     }
     $infoDivContents .= '</ul></div>';
 }
@@ -178,14 +179,22 @@ $resendID = (isset($_POST['resend_id'])) ? $_POST['resend_id'] : 0;
         <h1><?php echo HEADING_TITLE; ?></h1>
         <div class="col-md-4">
 <?php
+// -----
+// Add multiple customers via uploaded .csv/.txt form rendering.
+//
 if ($action == 'add_multiple') {
     echo $infoDivContents;
 }
 ?>
             <?php echo zen_draw_form('customers', FILENAME_ADD_CUSTOMERS, '', 'post', 'enctype="multipart/form-data" class="form-horizontal"') .
                        zen_hide_session_id() .
-                       zen_draw_hidden_field( 'action', 'add_multiple'); ?>
+                       zen_draw_hidden_field('action', 'add_multiple'); ?>
             <div class="row formAreaTitle"><?php echo CUSTOMERS_BULK_UPLOAD; ?></div>
+            <div class="pull-right noprint">
+                <a href="<?php echo HTTP_SERVER . DIR_WS_CATALOG; ?>add_customers_formatting_csv.html" rel="noopener" target="_blank" class="btn btn-sm btn-default btn-help" role="button" title="Help">
+                    <i class="fa fa-question fa-lg" aria-hidden="true"></i>
+                </a>
+            </div>
             <div class="formArea">
                 <div class="form-group">
                     <?php echo zen_draw_label(CUSTOMERS_FILE_IMPORT, 'bulk_upload', 'class="col-sm-3 control-label"'); ?>
@@ -207,20 +216,12 @@ if ($action == 'add_multiple') {
                 <div class="row text-right">
                     <button name="add_customers_in_bulk" type="submit" class="btn btn-primary"><?php echo IMAGE_UPLOAD; ?></button>
                 </div>
-<?php
-/*
-                        <tr>
-                            <td>
-                                <div style="width:350px; text-align: right;">
-                                    <a href="<?php echo HTTP_SERVER . DIR_WS_CATALOG; ?>add_customers_formatting_csv.html" target="_blank"><?php echo FORMATTING_THE_CSV; ?></a>&nbsp;<input type="submit" name="add_customers_in_bulk" value="Upload" />
-                                </div>
-                            </td>
-                        </tr>
-*/
-?>
             </div>
             <?php echo '</form>'; ?>
 <?php
+// -----
+// Resend-email form rendering.
+//
 if ($action == 'resend_email') {
     echo $infoDivContents;
 }
@@ -232,7 +233,7 @@ if ($action == 'resend_email') {
             <div class="formArea">
                 <div class="form-group">
                     <?php echo zen_draw_label(TEXT_CHOOSE_CUSTOMER, 'resend_id', 'class="col-sm-4 control-label"'); ?>
-                    <div class="col-sm-8 col-md-6"><?php echo zen_draw_pull_down_menu('resend_id', create_customer_drop_down(), $resendID); ?></div>
+                    <div class="col-sm-8 col-md-6"><?php echo zen_draw_pull_down_menu('resend_id', $acfa->createCustomerDropdown(), $resendID); ?></div>
                 </div>
                 <div class="form-group">
                     <?php echo zen_draw_label(TEXT_RESET_PASSWORD, 'reset_pw', 'class="col-sm-4 control-label"'); ?>
@@ -246,10 +247,13 @@ if ($action == 'resend_email') {
             </div>
             <?php echo '</form>'; ?>
         </div>
-        
+
         <div class="col-md-8">
 <?php
-if ($action === 'add_single' && isset($_POST['insert_y'])) {
+// -----
+// Add single-customer form rendering.
+//
+if ($action === 'add_single') {
     echo $infoDivContents;
 }
 ?>
@@ -281,8 +285,8 @@ if (ACCOUNT_GENDER === 'true') {
                     <div class="form-group">
                         <?php echo zen_draw_label(ENTRY_GENDER, 'customers_gender', 'class="col-sm-3 control-label"'); ?>
                         <div class="col-sm-9 col-md-6">
-                            <label class="radio-inline"><?php echo zen_draw_radio_field('customers_gender', 'part', $cInfo->customers_gender === 'm') . MALE; ?></label>
-                            <label class="radio-inline"><?php echo zen_draw_radio_field('customers_gender', 'file', $cInfo->customers_gender === 'f') . FEMALE; ?></label>
+                            <label class="radio-inline"><?php echo zen_draw_radio_field('customers_gender', 'm', $cInfo->customers_gender === 'm') . MALE; ?></label>
+                            <label class="radio-inline"><?php echo zen_draw_radio_field('customers_gender', 'f', $cInfo->customers_gender === 'f') . FEMALE; ?></label>
                         </div>
                     </div>
 <?php
@@ -474,7 +478,7 @@ if (CUSTOMERS_REFERRAL_STATUS === '2') {
                 </div>
                 <div class="row"><?php echo zen_draw_separator('pixel_trans.gif', '1', '10'); ?></div>
                 <div class="row text-right">
-                    <button name="insert" type="submit" class="btn btn-primary"><?php echo IMAGE_UPDATE; ?></button>
+                    <button name="insert" type="submit" class="btn btn-primary"><?php echo IMAGE_INSERT; ?></button>
                 </div>
             </div>
             <?php echo '</form>'; ?>

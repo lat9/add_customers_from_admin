@@ -9,6 +9,7 @@
  * www.inzencart.cz Czech forum for ZenCart
  *
  * Modified for Zen Cart 1.5.0, lat9, 2012-08-31
+ * Modified for Zen Cart 1.5.7, lat9, 2021-12-08
  */
 require DIR_WS_LANGUAGES . $_SESSION['language'] . '/gv_name.php';
 
@@ -16,11 +17,11 @@ define('HEADING_TITLE', 'Add Customers');
 
 define('TYPE_BELOW', 'Type below');
 define('PLEASE_SELECT', 'Select One');
-define('CUSTOMERS_REFERRAL', 'Customer Referral<br />1st Discount Coupon');
+define('CUSTOMERS_REFERRAL', 'Customer Referral<br>1st Discount Coupon');
 
 define('ENTRY_NONE', 'None');
 
-define('TABLE_HEADING_COMPANY','Company');
+define('TABLE_HEADING_COMPANY', 'Company');
 
 define('CUSTOMERS_AUTHORIZATION', 'Customers Authorization Status');
 define('CUSTOMERS_AUTHORIZATION_0', 'Approved');
@@ -59,22 +60,23 @@ define('EMAIL_TEXT_1', 'Your login ID is the e-mail address at which you receive
 define('EMAIL_TEXT_2', 'Your new password is: %s ' . "\n\n");
 define('EMAIL_TEXT_3', 'With your account, you can now take part in the <strong>various services</strong> we have to offer you. Some of these services include:' . "\n\n" . '<li><strong>Permanent Cart</strong> - Any products added to your online cart remain there until you remove them, or check them out.' . "\n\n" . '<li><strong>Address Book</strong> - We can now deliver your products to another address other than yours! This is perfect to send birthday gifts direct to the birthday-person themselves.' . "\n\n" . '<li><strong>Order History</strong> - View your history of purchases that you have made with us.' . "\n\n" . '<li><strong>Products Reviews</strong> - Share your opinions on products with our other customers.' . "\n\n");
 define('EMAIL_CONTACT', 'For help with any of our online services, please email the store-owner: <a href="mailto:' . STORE_OWNER_EMAIL_ADDRESS . '">'. STORE_OWNER_EMAIL_ADDRESS ." </a>\n\n");
-define('EMAIL_GV_CLOSURE','Sincerely,' . "\n\n" . STORE_OWNER . "\nStore Owner\n\n". '<a href="' . HTTP_SERVER . DIR_WS_CATALOG . '">'.HTTP_SERVER . DIR_WS_CATALOG ."</a>\n\n");
+define('EMAIL_GV_CLOSURE','Sincerely,' . "\n\n" . STORE_OWNER . "\nStore Owner\n\n". '<a href="' . zen_catalog_href_link(FILENAME_DEFAULT) . '">' . zen_catalog_href_link(FILENAME_DEFAULT) . "</a>\n\n");
 
 // email disclaimer - this disclaimer is separate from all other email disclaimers
 define('EMAIL_DISCLAIMER_NEW_CUSTOMER', 'This email address was given to us by you or by one of our customers. If you did not signup for an account, or feel that you have received this email in error, please send an email to %s ');
-define('ERROR_CUSTOMER_ERROR_1','There were errors');
-define('ERROR_CUSTOMER_EXISTS','Customers exist: ');
-define('CUSTOMERS_BULK_UPLOAD','Bulk Upload (CSV): ');
-define('CUSTOMERS_FILE_IMPORT','File to import: ');
-define('CUSTOMERS_INSERT_MODE','Insert Mode: ');
-define('CUSTOMERS_INSERT_MODE_VALID',' Part (Insert valid lines)');
-define('CUSTOMERS_INSERT_MODE_FILE',' File (Require whole file to be valid)');
-define('TEXT_FULL_NAME','(Full State)');
+
+define('ERROR_CUSTOMER_ERROR_1', 'There were errors');
+define('ERROR_CUSTOMER_EXISTS', 'Customers exist: ');
+define('CUSTOMERS_BULK_UPLOAD', 'Bulk Upload (CSV): ');
+define('CUSTOMERS_FILE_IMPORT', 'File to import: ');
+define('CUSTOMERS_INSERT_MODE', 'Insert Mode: ');
+define('CUSTOMERS_INSERT_MODE_VALID', ' Part (Insert valid lines)');
+define('CUSTOMERS_INSERT_MODE_FILE', ' File (Require whole file to be valid)');
+define('TEXT_FULL_NAME', '(Full State)');
 define('CUSTOMERS_ONE_FORMS','Click here to see the Single Customer form');
-//-added-v2.0.0-lat9
+
 define('ERROR_ON_LINE', 'Errors on line %u of the imported file');
-define('MESSAGE_CUSTOMERS_OK', 'Customers were inserted successfully.');
+define('MESSAGE_CUSTOMERS_OK', '%u customers were successfully inserted.');
 define('MESSAGE_LINES_OK_NOT_INSERTED', 'The following lines were validated but, due to errors in other records, were not inserted into the database.');
 define('MESSAGE_CUSTOMER_OK', 'The customer (%s) was inserted successfully.');
 define('LINE_MSG', 'Line %u (%s %s)');
@@ -108,7 +110,7 @@ define('ERROR_LAST_NAME', '"Last Name" must be at least ' . ENTRY_LAST_NAME_MIN_
 define('ERROR_GENDER', 'Gender not recognised. Expected "m" or "f", got: ');
 define('ERROR_EMAIL_LENGTH', '"E-Mail Address" must be at least ' . ENTRY_EMAIL_ADDRESS_MIN_LENGTH . ' characters in length.');
 define('ERROR_EMAIL_INVALID', 'The "E-Mail Address" format is not valid.');
-define('ERROR_EMAIL_ADDRESS_ERROR_EXISTS', 'The "E-Mail Address" (%s) already exists in our database.');
+define('ERROR_EMAIL_ADDRESS_ERROR_EXISTS', 'The "E-Mail Address" (%s) already exists.');
 define('ERROR_STREET_ADDRESS', '"Street Address" must be at least ' . ENTRY_STREET_ADDRESS_MIN_LENGTH . ' characters in length.');
 define('ERROR_CITY', '"City" must be at least ' . ENTRY_CITY_MIN_LENGTH . ' characters in length.');
 define('ERROR_DOB_INVALID', '"Date of Birth" must be in the format %s.');
@@ -122,3 +124,4 @@ define('ERROR_SELECT_STATE', 'Please select a "State".');
 define('ERROR_CANT_MOVE_FILE', 'Could not move file, check folder permissions.');
 define('ERROR_NO_CUSTOMER_SELECTED', 'Please select a customer before you press "Resend".');
 define('ERROR_UNKNOWN_GROUP_PRICING', 'Unknown "Customer Group Pricing" value (%u).');
+define('ERROR_MISSING_CREATE_ACCOUNT_COUPON', 'The create-account coupon (%s) is not valid; it has not been included in the customer welcome email.');
